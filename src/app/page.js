@@ -1,101 +1,280 @@
-import Image from "next/image";
+'use client';
+import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Area,
+  AreaChart
+} from 'recharts';
+
+// Import Map component dynamically to avoid SSR issues
+const Map = dynamic(() => import('@/components/Map'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[400px] w-full animate-pulse rounded-xl bg-[#1E293B]"></div>
+  ),
+});
+
+const COLORS = ['#8B5CF6', '#EC4899', '#3B82F6'];
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [selectedCamera, setSelectedCamera] = useState(null);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const response = await fetch('/api/stats');
+      const result = await response.json();
+      setData(result);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setLoading(false);
+    }
+  };
+
+  if (loading || !data) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-xl text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  // Get stats based on selected camera or all cameras
+  const getStats = () => {
+    if (selectedCamera) {
+      const cameraStats = data.cameraStats.find(c => c.camera_id === selectedCamera);
+      return {
+        detections: cameraStats.total_detections,
+        byType: {
+          human: cameraStats.human_detections,
+          vehicle: cameraStats.vehicle_detections,
+          animal: cameraStats.animal_detections,
+        },
+        activeAlerts: cameraStats.high_alerts + cameraStats.medium_alerts,
+        alertRate: Math.round(
+          ((cameraStats.high_alerts + cameraStats.medium_alerts) / cameraStats.total_detections) * 100
+        )
+      };
+    }
+    return {
+      detections: data.overall.total_detections,
+      byType: {
+        human: data.overall.human_detections,
+        vehicle: data.overall.vehicle_detections,
+        animal: data.overall.animal_detections,
+      },
+      activeAlerts: data.overall.high_alerts + data.overall.medium_alerts,
+      alertRate: Math.round(
+        ((data.overall.high_alerts + data.overall.medium_alerts) / data.overall.total_detections) * 100
+      )
+    };
+  };
+
+  const currentStats = getStats();
+  
+  const detectionData = [
+    { name: 'Human', value: currentStats.byType.human },
+    { name: 'Vehicle', value: currentStats.byType.vehicle },
+    { name: 'Animal', value: currentStats.byType.animal },
+  ];
+
+  const alertData = [
+    { name: 'High', value: data.overall.high_alerts },
+    { name: 'Medium', value: data.overall.medium_alerts },
+    { name: 'Low', value: data.overall.low_alerts },
+  ];
+
+  const filteredEvents = selectedCamera 
+    ? data.recentEvents.filter(event => event.camera_id === selectedCamera)
+    : data.recentEvents;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-white">Dashboard Overview</h1>
+        {selectedCamera && (
+          <button
+            onClick={() => setSelectedCamera(null)}
+            className="rounded-lg bg-[#2D3B4F] px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#374151]"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            View All Cameras
+          </button>
+        )}
+      </div>
+      
+      {/* Stats */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl bg-[#1E293B] p-6 shadow-lg">
+          <h3 className="text-sm font-medium text-gray-400">Total Detections</h3>
+          <p className="mt-2 text-3xl font-bold text-white">{currentStats.detections}</p>
+          <div className="mt-2 flex items-center text-sm text-violet-400">
+            <span>Last 24 hours</span>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+        <div className="rounded-xl bg-[#1E293B] p-6 shadow-lg">
+          <h3 className="text-sm font-medium text-gray-400">Active Alerts</h3>
+          <p className="mt-2 text-3xl font-bold text-white">{currentStats.activeAlerts}</p>
+          <div className="mt-2 flex items-center text-sm text-fuchsia-400">
+            <span>High & Medium Priority</span>
+          </div>
+        </div>
+        <div className="rounded-xl bg-[#1E293B] p-6 shadow-lg">
+          <h3 className="text-sm font-medium text-gray-400">Active Cameras</h3>
+          <p className="mt-2 text-3xl font-bold text-white">
+            {selectedCamera ? 1 : data.overall.active_cameras}
+          </p>
+          <div className="mt-2 flex items-center text-sm text-blue-400">
+            <span>Operational Status</span>
+          </div>
+        </div>
+        <div className="rounded-xl bg-[#1E293B] p-6 shadow-lg">
+          <h3 className="text-sm font-medium text-gray-400">Alert Rate</h3>
+          <p className="mt-2 text-3xl font-bold text-white">
+            {currentStats.alertRate}%
+          </p>
+          <div className="mt-2 flex items-center text-sm text-emerald-400">
+            <span>Of Total Detections</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="rounded-xl bg-[#1E293B] p-6 shadow-lg">
+          <h3 className="mb-4 text-lg font-medium text-white">Detections by Type</h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={detectionData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {detectionData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ backgroundColor: '#1E293B', borderColor: '#374151' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-[#1E293B] p-6 shadow-lg">
+          <h3 className="mb-4 text-lg font-medium text-white">Alerts by Level</h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={alertData}>
+                <defs>
+                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="name" stroke="#9CA3AF" />
+                <YAxis stroke="#9CA3AF" />
+                <Tooltip contentStyle={{ backgroundColor: '#1E293B', borderColor: '#374151' }} />
+                <Area type="monotone" dataKey="value" stroke="#8B5CF6" fillOpacity={1} fill="url(#colorValue)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Map Section */}
+      <div className="rounded-xl bg-[#1E293B] p-6 shadow-lg">
+        <h3 className="mb-4 text-lg font-medium text-white">Camera Locations</h3>
+        <div className="h-[400px]">
+          <Map
+            cameras={data.cameras}
+            selectedCamera={selectedCamera}
+            onCameraSelect={setSelectedCamera}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        </div>
+      </div>
+
+      {/* Recent Events */}
+      <div className="rounded-xl bg-[#1E293B] p-6 shadow-lg">
+        <h3 className="mb-4 text-lg font-medium text-white">
+          Recent Events {selectedCamera && `- ${data.cameras.find(c => c.camera_id === selectedCamera)?.name}`}
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-700">
+            <thead>
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                  Time
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                  Camera
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                  Event
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                  Details
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                  Alert Level
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-700">
+              {filteredEvents.map((event) => (
+                <tr key={event.id} className="hover:bg-[#2D3B4F] transition-colors">
+                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-300">
+                    {new Date(event.timestamp).toLocaleString()}
+                  </td>
+                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-300">
+                    {data.cameras.find(c => c.camera_id === event.camera_id)?.name || event.camera_id}
+                  </td>
+                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-300">
+                    {event.event_type}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-300">
+                    {event.details}
+                  </td>
+                  <td className="whitespace-nowrap px-6 py-4 text-sm">
+                    <span
+                      className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
+                        event.alert_level === 'high'
+                          ? 'bg-red-900 text-red-200'
+                          : event.alert_level === 'medium'
+                          ? 'bg-yellow-900 text-yellow-200'
+                          : 'bg-green-900 text-green-200'
+                      }`}
+                    >
+                      {event.alert_level}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
