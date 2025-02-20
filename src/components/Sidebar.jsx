@@ -12,11 +12,11 @@ const Sidebar = () => {
       href: '/',
       icon: '📊',
     },
-    // {
-    //   name: 'Live Feeds',
-    //   href: '/live-feeds',
-    //   icon: '📡',
-    // },
+    {
+      name: 'Live Feeds',
+      href: '/live-feeds',
+      icon: '📡',
+    },
     {
       name: 'Events',
       href: '/events',
