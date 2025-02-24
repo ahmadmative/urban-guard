@@ -6,7 +6,7 @@ let db;
 export function getDb() {
   if (!db) {
     try {
-      db = new Database(path.join(process.cwd(), 'data.db'), { readonly: true });
+      db = new Database(path.join(process.cwd(), 'events.db'), { readonly: true });
       db.pragma('journal_mode = WAL');
     } catch (error) {
       console.error('Database connection error:', error);

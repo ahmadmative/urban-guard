@@ -63,7 +63,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  });
 
   const fetchData = async () => {
     try {
